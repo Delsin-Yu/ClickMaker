@@ -1,2 +1,2 @@
 # ClickMaker
-A utility tool that translates the Time Signature &amp; Tempo Change events from a given MIDI file into the Click (Metronome) Sound Track file.
+A utility tool that compiles the Time Signature & Tempo Change events from given MIDI files into Click (Metronome) Sound Track files.
