@@ -72,15 +72,11 @@ static List<ClickInfo> CreateClickInfo(string midiFilePath)
 
     var offset = currentMicrosecond;
     currentMicrosecond = 0;
+    var oneBeatTimeSpan = GetOneBeatMusicalLength(currentTimeSignature);
+    var currentTimeSpan = new MetricTimeSpan(currentMicrosecond);
     
     while (currentMicrosecond < maxMicroseconds)
     {
-        if (tempoQueue.TryPeek(out var newTempo) && newTempo.Microsecond <= currentMicrosecond)
-            currentTempo = tempoQueue.Dequeue().Tempo;
-
-        if (timeQueue.TryPeek(out var newTime) && newTime.Microsecond <= currentMicrosecond)
-            currentTimeSignature = timeQueue.Dequeue().TimeSignature;   
-
         clickInfos.Add(new(currentMicrosecond + offset,
             remainingBeats == currentTimeSignature.Numerator
                 ? ClickType.Primary
@@ -90,7 +86,24 @@ static List<ClickInfo> CreateClickInfo(string midiFilePath)
 
         if (remainingBeats <= 0) remainingBeats = currentTimeSignature.Numerator;
 
-        currentMicrosecond += (long)Math.Round(currentTempo.MicrosecondsPerQuarterNote * (4d / currentTimeSignature.Denominator));
+        currentTimeSpan.UnsafeChangeTime(currentMicrosecond);
+        var metricTimeLength = LengthConverter.ConvertTo<MetricTimeSpan>(
+            oneBeatTimeSpan,
+            currentTimeSpan,
+            sourceTempoMap
+        );
+        
+        currentMicrosecond += metricTimeLength.TotalMicroseconds;
+        
+        if (tempoQueue.TryPeek(out var newTempo) && newTempo.Microsecond <= currentMicrosecond) 
+            currentTempo = tempoQueue.Dequeue().Tempo;
+
+        if (timeQueue.TryPeek(out var newTime) && newTime.Microsecond <= currentMicrosecond)
+        {
+            currentTimeSignature = timeQueue.Dequeue().TimeSignature;
+            oneBeatTimeSpan = GetOneBeatMusicalLength(currentTimeSignature);
+            remainingBeats = currentTimeSignature.Numerator;
+        }   
     }
 
     for (var beat = 0; beat < currentTimeSignature.Numerator; beat++)
@@ -102,6 +115,10 @@ static List<ClickInfo> CreateClickInfo(string midiFilePath)
     return clickInfos;
 }
 
+static MusicalTimeSpan GetOneBeatMusicalLength(TimeSignature timeSignature)
+{
+    return new(1, timeSignature.Denominator);
+}
 
 static void CreateAudioTrack(ReadOnlySpan<ClickInfo> clickInfo, string dstPath, string primaryClickPath, string secondaryClickPath)
 {
@@ -145,8 +162,8 @@ static void CreateAudioTrack(ReadOnlySpan<ClickInfo> clickInfo, string dstPath, 
         currentMicrosecond = click.Microsecond;
     }
 
-    var output = new DirectSoundOut(1024);
     var concatenatingSampleProvider = new ConcatenatingSampleProvider(sampleSequence);
+    // var output = new DirectSoundOut(1024);
     // output.Init(concatenatingSampleProvider);
     // output.Play();
     // while (output.PlaybackState == PlaybackState.Playing)
@@ -181,8 +198,14 @@ internal record struct TempoEvent(long Microsecond, Tempo Tempo);
 public static class Accessor
 {
     public static ISampleProvider UnsafeAccessInternalSampleProvider(this OffsetSampleProvider provider) =>
-        AccessorImpl(provider);
+        AccessorImpl1(provider);
+    
+    public static void UnsafeChangeTime(this MetricTimeSpan metricTimeSpan, long totalMicroseconds) =>
+        AccessorImpl2(metricTimeSpan) = new(totalMicroseconds * 10);
     
     [UnsafeAccessor(UnsafeAccessorKind.Field, Name = "sourceProvider")]
-    private static extern ref ISampleProvider AccessorImpl(OffsetSampleProvider provider);
+    private static extern ref ISampleProvider AccessorImpl1(OffsetSampleProvider provider);
+    
+    [UnsafeAccessor(UnsafeAccessorKind.Field, Name = "_timeSpan")]
+    private static extern ref TimeSpan AccessorImpl2(MetricTimeSpan time);
 }

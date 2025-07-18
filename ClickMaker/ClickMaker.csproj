@@ -8,7 +8,7 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <PackageReference Include="Melanchall.DryWetMidi" Version="8.0.1" />
+        <PackageReference Include="Melanchall.DryWetMidi.Nativeless" Version="8.0.1" />
         <PackageReference Include="NAudio" Version="2.2.1" />
     </ItemGroup>
 
