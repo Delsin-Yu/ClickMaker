@@ -9,6 +9,12 @@
 
     <ItemGroup>
         <PackageReference Include="Melanchall.DryWetMidi" Version="8.0.1" />
+        <PackageReference Include="NAudio" Version="2.2.1" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <None Update="ClickPrimary.wav" CopyToOutputDirectory="PreserveNewest"/>
+      <None Update="ClickSecondary.wav" CopyToOutputDirectory="PreserveNewest"/>
     </ItemGroup>
 
 </Project>
