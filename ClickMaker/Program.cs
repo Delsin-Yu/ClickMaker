@@ -42,11 +42,6 @@ static List<ClickInfo> CreateClickInfo(string midiFilePath)
         .Select(x => new TimeSignatureEvent(x.Time, x.Value))
         .ToList();
 
-    var tempoChange = sourceTempoMap
-        .GetTempoChanges()
-        .Select(x => new TempoEvent(x.Time, x.Value))
-        .ToArray();
-
     if (timeSigChange.Count == 0 || timeSigChange[0].MidiTime != 0)
         timeSigChange.Insert(0, new(0, TimeSignature.Default));
     
@@ -54,16 +49,18 @@ static List<ClickInfo> CreateClickInfo(string midiFilePath)
     var clickInfos = new List<ClickInfo>();
     var currentTimeSignature = timeQueue.Dequeue().TimeSignature;
     var oneBeatMusicalLength = GetOneBeatMusicalLength(currentTimeSignature);
-    var currentMidiTime = 0L;
-    
+
     var oneBeatMetricLength = LengthConverter.ConvertTo<MetricTimeSpan>(oneBeatMusicalLength, 0, sourceTempoMap);
-    for (var i = 0; i < currentTimeSignature.Numerator; i++)
+
+    const int prewarmTimes = 2;
+    
+    for (var i = 0; i < currentTimeSignature.Numerator * prewarmTimes; i++)
     {
-        clickInfos.Add(new(i * oneBeatMetricLength.TotalMicroseconds, i == 0 ? ClickType.PreparePrimary : ClickType.PrepareSecondary));
+        clickInfos.Add(new(i * oneBeatMetricLength.TotalMicroseconds, i % currentTimeSignature.Numerator == 0 ? ClickType.PreparePrimary : ClickType.PrepareSecondary));
     }
 
-    var offsetMicroseconds = oneBeatMetricLength.TotalMicroseconds * currentTimeSignature.Numerator;
-    currentMidiTime = 0;
+    var offsetMicroseconds = oneBeatMetricLength.TotalMicroseconds * currentTimeSignature.Numerator * prewarmTimes;
+    long currentMidiTime = 0;
     var remainingBeats = currentTimeSignature.Numerator;
     while (currentMidiTime < maxMidiClicks)
     {
