@@ -1,28 +1,48 @@
 ﻿using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
+using System.Text.Json;
+using System.Text.Json.Schema;
+using System.Text.Json.Serialization;
 using Melanchall.DryWetMidi.Core;
 using Melanchall.DryWetMidi.Interaction;
 using NAudio.Wave;
 using NAudio.Wave.SampleProviders;
 
-const string midiDir = @"D:\Desktop\ClickCreate";
 const string primaryClickPath = "ClickPrimary.wav";
 const string secondaryClickPath = "ClickSecondary.wav";
+const string configFilePath = "Config.json";
 
-foreach (var file in Directory.GetFiles(
-             midiDir,
-             "*.mid",
-             SearchOption.TopDirectoryOnly
-         ))
+if (!File.Exists(configFilePath))
+{
+    var dummyConfig = new SoundConfigProfile([
+        new("Example1.mid", []),
+        new("Example2.mid", [1, 3])
+    ]);
+    var dummyJson = JsonSerializer.Serialize(dummyConfig, SerializerContext.Default.SoundConfigProfile);
+    File.WriteAllText(configFilePath, dummyJson);
+    var schema = SerializerContext.Default.SoundConfigProfile.GetJsonSchemaAsNode().ToJsonString();
+    File.WriteAllText("Config.schema.json", schema);
+    Console.WriteLine($"Config file not found. Dummy config file & schema file have been created at {Path.GetFullPath(configFilePath)}");
+    return;
+}
+
+var configJson = File.ReadAllText(configFilePath);
+var config = JsonSerializer.Deserialize(configJson, SerializerContext.Default.SoundConfigProfile);
+
+if (config.Configs.Length == 0)
+    return;
+
+foreach (var (file, importantBars) in config.Configs)
 {
     var clicks = CreateClickInfo(file);
     CreateAudioTrack(
         CollectionsMarshal.AsSpan(clicks),
+        importantBars.AsSpan(),
         Path.ChangeExtension(file, "click.wav"),
         primaryClickPath,
         secondaryClickPath
-     );
+    );
 }
 
 return;
@@ -98,7 +118,7 @@ static MusicalTimeSpan GetOneBeatMusicalLength(TimeSignature timeSignature)
     return new(1, timeSignature.Denominator);
 }
 
-static void CreateAudioTrack(ReadOnlySpan<ClickInfo> clickInfo, string dstPath, string primaryClickPath, string secondaryClickPath)
+static void CreateAudioTrack(ReadOnlySpan<ClickInfo> clickInfo, ReadOnlySpan<int> importantBarNumber, string dstPath, string primaryClickPath, string secondaryClickPath)
 {
     var sampleSequence = new List<ISampleProvider>();
     var currentMicrosecond = 0L;
@@ -187,3 +207,11 @@ public static class Accessor
     [UnsafeAccessor(UnsafeAccessorKind.Field, Name = "_timeSpan")]
     private static extern ref TimeSpan AccessorImpl2(MetricTimeSpan time);
 }
+
+public record SoundConfig(string MidiFilePath, int[] ImportantBars);
+
+public record struct SoundConfigProfile(SoundConfig[] Configs);
+
+[JsonSerializable(typeof(SoundConfigProfile))]
+[JsonSourceGenerationOptions(WriteIndented = true)]
+public partial class SerializerContext : JsonSerializerContext;
