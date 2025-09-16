@@ -15,6 +15,7 @@
     <ItemGroup>
       <None Update="ClickPrimary.wav" CopyToOutputDirectory="PreserveNewest"/>
       <None Update="ClickSecondary.wav" CopyToOutputDirectory="PreserveNewest"/>
+      <None Update="VoiceBank\**\*.mp3" CopyToOutputDirectory="PreserveNewest"/>
     </ItemGroup>
 
 </Project>
