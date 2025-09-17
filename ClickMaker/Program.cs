@@ -40,7 +40,7 @@ foreach (var (file, importantBars) in config.Configs)
     CreateAudioTrack(
         CollectionsMarshal.AsSpan(clicks),
         importantBars.AsSpan(),
-        Path.ChangeExtension(file, "click.wav"),
+        file,
         cache
     );
 }
@@ -125,7 +125,8 @@ static MusicalTimeSpan GetOneBeatMusicalLength(TimeSignature timeSignature)
 static void CreateAudioTrack(ReadOnlySpan<ClickInfo> clickInfo, ReadOnlySpan<int> importantBarNumber, string dstPath,
     Dictionary<int, AudioFileReaderAllocation> cache)
 {
-    var sequencer = new WaveSequencer();
+    var clickSequencer = new WaveSequencer();
+    var voiceSequencer = new WaveSequencer();
     const uint VoiceOffset = 120_000;
     var barNumber = 0;
     var prepareVoiceNumber = 1;
@@ -158,12 +159,12 @@ static void CreateAudioTrack(ReadOnlySpan<ClickInfo> clickInfo, ReadOnlySpan<int
                 remainingCountDownBars--;
                 prepareVoiceNumber = 1;
                 clickSample = new(primaryClickPath);
-                if(remainingCountDownBars == 0) voiceSample = GetNumberVoice(1, cache);
+                if (remainingCountDownBars == 0) voiceSample = GetNumberVoice(1, cache);
                 break;
             case ClickType.PrepareSecondary:
                 prepareVoiceNumber++;
                 clickSample = new(secondaryClickPath);
-                if(remainingCountDownBars == 0) voiceSample = GetNumberVoice(prepareVoiceNumber, cache);
+                if (remainingCountDownBars == 0) voiceSample = GetNumberVoice(prepareVoiceNumber, cache);
                 break;
             case ClickType.Final:
                 clickSample = new(primaryClickPath);
@@ -172,11 +173,22 @@ static void CreateAudioTrack(ReadOnlySpan<ClickInfo> clickInfo, ReadOnlySpan<int
                 throw new UnreachableException();
         }
 
-        sequencer.AddSample(clickSample, (long)(click.Microsecond + VoiceOffset));
+        clickSequencer.AddSample(clickSample, (long)(click.Microsecond + VoiceOffset));
         if (voiceSample == null) continue;
-        sequencer.AddSample(voiceSample, (long)click.Microsecond);
+        voiceSequencer.AddSample(voiceSample, (long)click.Microsecond);
     }
-    WaveFileWriter.CreateWaveFile16(dstPath, sequencer.Bake());
+
+    var clickFile = Path.ChangeExtension(dstPath, ".click.wav");
+    var voiceFile = Path.ChangeExtension(dstPath, ".voice.wav");
+    WaveFileWriter.CreateWaveFile16(clickFile, clickSequencer.Bake());
+    WaveFileWriter.CreateWaveFile16(voiceFile, voiceSequencer.Bake());
+    
+    var mixed = new MixingSampleProvider([
+        new AudioFileReader(clickFile),
+        new AudioFileReader(voiceFile)
+    ]);
+    
+    WaveFileWriter.CreateWaveFile16(Path.ChangeExtension(dstPath, ".clickvoice.wav"), mixed);
 }
 
 static AudioFileReader GetNumberVoice(int number, Dictionary<int, AudioFileReaderAllocation> cachedAllocations)
