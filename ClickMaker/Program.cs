@@ -127,7 +127,7 @@ static void CreateAudioTrack(ReadOnlySpan<ClickInfo> clickInfo, ReadOnlySpan<int
 {
     var clickSequencer = new WaveSequencer();
     var voiceSequencer = new WaveSequencer();
-    const uint VoiceOffset = 120_000;
+    const uint VoiceOffset = 200_000;
     var barNumber = 0;
     var prepareVoiceNumber = 1;
     var remainingCountDownBars = PrepareTimes;
@@ -193,11 +193,11 @@ static void CreateAudioTrack(ReadOnlySpan<ClickInfo> clickInfo, ReadOnlySpan<int
 
 static AudioFileReader GetNumberVoice(int number, Dictionary<int, AudioFileReaderAllocation> cachedAllocations)
 {
-    ArgumentOutOfRangeException.ThrowIfGreaterThan(number, 9999);
+    ArgumentOutOfRangeException.ThrowIfGreaterThan(number, 999);
     ArgumentOutOfRangeException.ThrowIfLessThan(number, 1);
     if (cachedAllocations.TryGetValue(number, out var allocation))
         return allocation.CreateReader();
-    var path = Path.Combine("VoiceBank", $"{number:D4}.mp3");
+    var path = Path.Combine("VoiceBank", $"{number:000}.mp3");
     allocation = new(path);
     cachedAllocations[number] = allocation;
     return allocation.CreateReader();
